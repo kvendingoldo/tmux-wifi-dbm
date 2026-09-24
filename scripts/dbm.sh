@@ -8,13 +8,14 @@
 #   dbm     (default)  -62
 #   label              Good
 #   status             -62 [Good]
+#   color              #[fg=yellow]
 
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${CURRENT_DIR}/helpers.sh"
 
 MODE="${1:-dbm}"
 
-OFFLINE_TEXT="$(get_tmux_option "@wifi_dbm_offline_text" "--")"
+OFFLINE_TEXT="$(get_wifi_dbm_option "@wifi_dbm_offline_text" "--")"
 # How long a system_profiler reading stays usable. That call takes several
 # seconds, so it is only ever refreshed in the background.
 FALLBACK_TTL=15
@@ -122,32 +123,56 @@ function read_osx() {
   read_cached_fallback
 }
 
-# Maps a reading onto a quality word. The cut-offs follow the usual Wi-Fi
+# Maps a reading onto one of five bands. The cut-offs follow the usual Wi-Fi
 # reference points: -67 dBm is the floor for reliable streaming and VoIP, and
-# below about -75 dBm a link is only good for light traffic.
-#
-# Thresholds are read lazily: the plain dbm mode never needs them, and each
-# lookup costs a tmux round-trip.
-function label_for() {
+# below about -75 dBm a link only carries light traffic.
+function band_for() {
   local dbm="${1}"
 
   local t_excellent t_good t_fair t_weak
-  t_excellent="$(get_tmux_option "@wifi_dbm_threshold_excellent" "-50")"
-  t_good="$(get_tmux_option "@wifi_dbm_threshold_good" "-60")"
-  t_fair="$(get_tmux_option "@wifi_dbm_threshold_fair" "-67")"
-  t_weak="$(get_tmux_option "@wifi_dbm_threshold_weak" "-75")"
+  t_excellent="$(get_wifi_dbm_option "@wifi_dbm_threshold_excellent" "-50")"
+  t_good="$(get_wifi_dbm_option "@wifi_dbm_threshold_good" "-60")"
+  t_fair="$(get_wifi_dbm_option "@wifi_dbm_threshold_fair" "-67")"
+  t_weak="$(get_wifi_dbm_option "@wifi_dbm_threshold_weak" "-75")"
 
   if [ "${dbm}" -ge "${t_excellent}" ]; then
-    get_tmux_option "@wifi_dbm_label_excellent" "Excellent"
+    printf 'excellent'
   elif [ "${dbm}" -ge "${t_good}" ]; then
-    get_tmux_option "@wifi_dbm_label_good" "Good"
+    printf 'good'
   elif [ "${dbm}" -ge "${t_fair}" ]; then
-    get_tmux_option "@wifi_dbm_label_fair" "Fair"
+    printf 'fair'
   elif [ "${dbm}" -ge "${t_weak}" ]; then
-    get_tmux_option "@wifi_dbm_label_weak" "Weak"
+    printf 'weak'
   else
-    get_tmux_option "@wifi_dbm_label_poor" "Poor"
+    printf 'poor'
   fi
+}
+
+function label_for() {
+  local band="${1}"
+  case "${band}" in
+    excellent) get_wifi_dbm_option "@wifi_dbm_label_excellent" "Excellent" ;;
+    good)      get_wifi_dbm_option "@wifi_dbm_label_good"      "Good" ;;
+    fair)      get_wifi_dbm_option "@wifi_dbm_label_fair"      "Fair" ;;
+    weak)      get_wifi_dbm_option "@wifi_dbm_label_weak"      "Weak" ;;
+    *)         get_wifi_dbm_option "@wifi_dbm_label_poor"      "Poor" ;;
+  esac
+}
+
+# Emits a tmux style directive, e.g. "#[fg=yellow]", the same shape tmux-cpu
+# and tmux-battery use so it composes with an existing status line.
+function color_for() {
+  local band="${1}"
+  local color
+  case "${band}" in
+    excellent) color="$(get_wifi_dbm_option "@wifi_dbm_color_excellent" "green")" ;;
+    good)      color="$(get_wifi_dbm_option "@wifi_dbm_color_good"      "green")" ;;
+    fair)      color="$(get_wifi_dbm_option "@wifi_dbm_color_fair"      "yellow")" ;;
+    weak)      color="$(get_wifi_dbm_option "@wifi_dbm_color_weak"      "colour208")" ;;
+    offline)   color="$(get_wifi_dbm_option "@wifi_dbm_color_offline"   "colour244")" ;;
+    *)         color="$(get_wifi_dbm_option "@wifi_dbm_color_poor"      "red")" ;;
+  esac
+  printf '#[fg=%s]' "${color}"
 }
 
 function read_dbm() {
@@ -158,20 +183,36 @@ function read_dbm() {
   fi
 }
 
+function offline_output() {
+  if [ "${MODE}" = "color" ]; then
+    color_for "offline"
+  else
+    printf '%s' "${OFFLINE_TEXT}"
+  fi
+}
+
 function main() {
   local dbm
-  dbm="$(read_dbm)" || { printf '%s' "${OFFLINE_TEXT}"; return 0; }
+  if ! dbm="$(read_dbm)"; then
+    offline_output
+    return 0
+  fi
 
   # Normalise to a bare signed integer; sources pad or suffix differently.
   dbm="$(printf '%s' "${dbm}" | tr -dc '\-0-9')"
   if [ -z "${dbm}" ] || [ "${dbm}" = "-" ]; then
-    printf '%s' "${OFFLINE_TEXT}"
+    offline_output
     return 0
   fi
 
+  # One band lookup feeds every mode.
+  local band
+  band="$(band_for "${dbm}")"
+
   case "${MODE}" in
-    label)  printf '%s' "$(label_for "${dbm}")" ;;
-    status) printf '%s [%s]' "${dbm}" "$(label_for "${dbm}")" ;;
+    label)  label_for "${band}" ;;
+    color)  color_for "${band}" ;;
+    status) printf '%s [%s]' "${dbm}" "$(label_for "${band}")" ;;
     *)      printf '%s' "${dbm}" ;;
   esac
 }

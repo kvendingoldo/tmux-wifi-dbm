@@ -29,13 +29,35 @@ set -g status-right 'wifi #{wifi_dbm} dBm'
 | `#{wifi_dbm}` | `-65` |
 | `#{wifi_dbm_label}` | `Good` |
 | `#{wifi_dbm_status}` | `-65 [Good]` |
+| `#{wifi_dbm_color}` | `#[fg=green]` |
 
 Use `#{wifi_dbm_status}` for the number and the quality word together, or
-combine the other two to control the formatting yourself:
+combine the others to control the formatting yourself:
 
 ```
 set -g status-right 'WiFi: #{wifi_dbm} dBm (#{wifi_dbm_label})'
 ```
+
+## Color
+
+`#{wifi_dbm_color}` emits a tmux style directive for the current band, so it
+composes like `#{cpu_fg_color}` does. Put it before the value and close with
+`#[default]`:
+
+```
+set -g status-right 'WiFi: #{wifi_dbm_color}#{wifi_dbm_status}#[default]'
+```
+
+| Band | Default color |
+| --- | --- |
+| `Excellent` | `green` |
+| `Good` | `green` |
+| `Fair` | `yellow` |
+| `Weak` | `colour208` (orange) |
+| `Poor` | `red` |
+| offline | `colour244` (grey) |
+
+Any tmux color works — `red`, `colour208`, `#ff8800`.
 
 ## Signal quality
 
@@ -65,11 +87,18 @@ and below about `-75` dBm a link only carries light traffic:
 | `@wifi_dbm_threshold_good` | `-60` | Lower bound of `Good` |
 | `@wifi_dbm_threshold_fair` | `-67` | Lower bound of `Fair` |
 | `@wifi_dbm_threshold_weak` | `-75` | Lower bound of `Weak`; below this is `Poor` |
+| `@wifi_dbm_color_excellent` | `green` | Color for the strongest band |
+| `@wifi_dbm_color_good` | `green` | |
+| `@wifi_dbm_color_fair` | `yellow` | |
+| `@wifi_dbm_color_weak` | `colour208` | |
+| `@wifi_dbm_color_poor` | `red` | |
+| `@wifi_dbm_color_offline` | `colour244` | Color when the radio is off |
 
 ```
 set -g @wifi_dbm_offline_text 'off'
 set -g @wifi_dbm_label_excellent 'Great'
 set -g @wifi_dbm_threshold_good '-58'
+set -g @wifi_dbm_color_fair 'colour214'
 ```
 
 Thresholds must stay in descending order (`excellent` > `good` > `fair` >

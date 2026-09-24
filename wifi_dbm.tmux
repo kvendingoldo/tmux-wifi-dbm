@@ -10,12 +10,14 @@ source "${CURRENT_DIR}/scripts/helpers.sh"
 placeholders=(
   "\#{wifi_dbm_status}"
   "\#{wifi_dbm_label}"
+  "\#{wifi_dbm_color}"
   "\#{wifi_dbm}"
 )
 
 commands=(
   "#($CURRENT_DIR/scripts/dbm.sh status)"
   "#($CURRENT_DIR/scripts/dbm.sh label)"
+  "#($CURRENT_DIR/scripts/dbm.sh color)"
   "#($CURRENT_DIR/scripts/dbm.sh)"
 )
 
