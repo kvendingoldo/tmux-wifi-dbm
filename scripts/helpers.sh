@@ -3,7 +3,7 @@
 function get_tmux_option() {
   local option="${1}"
   local default_value="${2}"
-  local option_value="$(tmux show-option -gqv "${option}")"
+  local option_value="$(tmux show-option -gqv "${option}" 2>/dev/null)"
   if [ -z "${option_value}" ]; then
     echo "${default_value}"
   else
@@ -18,18 +18,24 @@ function set_tmux_option() {
 }
 
 function is_osx() {
-  [ $(uname) == "Darwin" ]
+  [ "$(uname)" = "Darwin" ]
 }
 
 function is_linux(){
-  [ $(uname -s) == "Linux" ]
+  [ "$(uname -s)" = "Linux" ]
 }
 
 function is_freebsd() {
-    [ $(uname) == FreeBSD ]
+  [ "$(uname)" = "FreeBSD" ]
 }
 
 function command_exists() {
   local command="${1}"
   type "${command}" >/dev/null 2>&1
+}
+
+# Per-user scratch space for the compiled CoreWLAN helper and the cached
+# fallback reading.
+function cache_dir() {
+  echo "${XDG_CACHE_HOME:-${HOME}/.cache}/tmux-wifi-dbm"
 }
